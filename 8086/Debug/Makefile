@@ -16,9 +16,9 @@ LDFLAGS=/CODEVIEW
 ## Processing Tools
 ASM=ml.exe
 LD=link16.exe
-#  C:/Users/Luan/Desktop/trabalho/8086/Debug/Debug.exe: TOOL=LD
-#     C:/Users/Luan/Desktop/trabalho/8086/Debug/main.obj: TOOL=ASM
-#        C:/Users/Luan/Desktop/trabalho/8086/main.asm
+#  D:/Git/JogoDaSoma/8086/Debug/Debug.exe: TOOL=LD
+#     D:/Git/JogoDaSoma/8086/Debug/main.obj: TOOL=ASM
+#        D:/Git/JogoDaSoma/8086/main.asm
 
 # Build tree:
 all:	Debug
