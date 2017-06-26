@@ -128,7 +128,7 @@ ENDM
 ORG 0008H
 PONTEIRO_TRATADOR_INTERRUPCAO DB 4 DUP(?) ; PONTEIRO PARA INTERRUPCAO
 ;APONTA PARA UMA ROTINA CHAMADA A CADA 1 SEGUNDO VIA HARDWARE INTERRUPT
-;OBSERVE NO 8086 O PINO NMI, ELE ESTA RECEBENDO UM PULSO A CADA UM SEGUNDO, FORÇANDO A INTERRUPÇÃO
+;OBSERVE NO 8086 O PINO NMI, ELE ESTA RECEBENDO UM PULSO A CADA UM SEGUNDO, FORï¿½ANDO A INTERRUPï¿½ï¿½O
 
 ORG 0400H
 
@@ -747,7 +747,7 @@ PRINTING_CAR:
 	
 ;---------------------------------------------------------
 ; AH = COLUNA, AL=LINHA
-; PRIMEIRO BYTE DO VETOR É NUMERO DE LINHAS E COLUNAS OCUPADAS
+; PRIMEIRO BYTE DO VETOR ï¿½ NUMERO DE LINHAS E COLUNAS OCUPADAS
 ; EXEMPLO, IMAGEM DE 24X24 PIXELS = 3 LINHAS X 3 COLUNAS
 PRINT_ICON:
 	PUSHF
@@ -1039,12 +1039,31 @@ LE_PORT_C:
 ;---------------------------------------------------------
 
 ;==============================================	
-; ESTA ROTINA É CHAMADA UMA VEZ POR SEGUNDO
+; ESTA ROTINA ï¿½ CHAMADA UMA VEZ POR SEGUNDO
 ; USADO PARA MUDAR O SEED	
 INTERRUPT_ONE_SECOND:
-	 INC BYTE PTR CONTADOR_SEED
+	 PUSH AX
+	 PUSH BX
+	 
+	 MOV AX, [SECONDS]
+	 MOV BX, 5
+	 DIV BL
+	 ADD AH, 1
+	 
+	 MOV BL, [BYTE PTR CONTADOR_SEED]
+	 ADD BL, AH
+	 CMP BL, 100
+	 JL eh_menor_que_cem
+	 
+	 SUB BL, 100
+	 
+	 eh_menor_que_cem:
+	 MOV [BYTE PTR CONTADOR_SEED], BL
+	 
 	 CALL TIMER
 SAI_INTERRUPT:
+	 POP BX
+	 POP AX
 	 IRET
 	
 TIMER:
@@ -1061,25 +1080,7 @@ RESET_TIMER:
    JMP RETURN_TIMER
 
 ;==============================================	 
-	 
-RANDOM:
-	PUSH DX
-	MOV AX,SEED ;; AX = seed
-	ADD AL,CONTADOR_SEED ; ATUALIZADO A CADA 1 SEGUNDO VIA INTERRUPT
-	MOV DX,8405h ;; DX = 8405h
-	MUL DX ;; MUL (8405h * SEED) into dword DX:AX
-;
-	CMP AX,SEED
-	JNZ GOTSEED ;; if new SEED = old SEED, alter SEED
-	MOV AH,DL
-	INC AX
-GOTSEED:
-	MOV SEED,AX ;; We have a new seed, so store it
-	MOV AX,DX ;; AL = random number
-	POP DX
-	RET
 	
-
 INICIALIZA_8251:                                     
    MOV AL,0
    MOV DX, ADR_USART_CMD
@@ -1343,10 +1344,245 @@ DEMO:
 	;CALL RECEBE_CARACTER
 	;CALL MANDA_CARACTER
 
+GERAR_CONTA:
+      PUSH AX
+      PUSH BX
+      PUSH CX
+
+      MOV AL, 100
+      CALL GENERATE_RANDOM
+      MOV [NUM_1], AL
+      MOV BL, 1 ; linha
+      MOV BH, 8 ; coluna
+      CALL IMPRIME_NUMERO
+      
+      PUSH AX
+      MOV AL, 2 ; linha
+      MOV AH, 6 ; coluna
+      CALL GLCD_GOTO_XY_TEXT
+      MOV AL, "+"
+      CALL PRINT_CAR
+      POP AX
+      
+      MOV CL, 100
+      SUB CL, AL
+      MOV AL, CL
+      CALL GENERATE_RANDOM
+      MOV [NUM_2], AL
+      MOV BL, 2 ; linha
+      MOV BH, 8 ; coluna
+      CALL IMPRIME_NUMERO
+      
+      CALL IMPRIME_TRACOS
+      
+      MOV AL, [NUM_1]
+      ADD AL, [NUM_2]
+      MOV [RESULTADO], AL
+      
+      CALL CONTAR_QUANTIDADE_NUMEROS
+      MOV [NUMERO_DE_INPUTS], AL
+      
+      POP CX
+      POP BX
+      POP AX
+RET
+	
+CONTAR_QUANTIDADE_NUMEROS:
+   PUSH BX
+   PUSH CX
+   
+   MOV CX, 0
+   
+   contar_quantidade_numero:
+   INC CX
+   
+   MOV AH, 0
+   MOV BX, 10
+   DIV BL
+   
+   CMP AL, 0
+   JE terminou_contagem
+   
+   MOV AH, 0 ; O quociente vira o numero a ser contado a quantidade de numeros posteriormente
+   JMP contar_quantidade_numero
+   
+   terminou_contagem:
+   MOV AL, CL
+   POP CX
+   POP BX
+RET	
+	
+IMPRIME_TRACOS:
+      PUSH AX
+      PUSH CX
+     
+      MOV AL, 3 ; linha
+      MOV AH, 8 ; coluna
+      MOV CX, 2
+      imprime_traco:
+      
+      CALL GLCD_GOTO_XY_TEXT
+      PUSH AX
+      MOV AL, "-"
+      CALL PRINT_CAR
+      POP AX
+      
+      PUSH AX
+      INC AL
+      CALL GLCD_GOTO_XY_TEXT
+      
+      MOV AL, " "
+      CALL PRINT_CAR
+      POP AX
+      
+      DEC AH
+      LOOP imprime_traco
+      
+      POP CX
+      POP AX
+RET	
+	
+IMPRIME_NUMERO:
+   PUSH AX
+   PUSH BX
+   PUSH CX
+   PUSH DX
+
+   MOV CH, 0
+   MOV CL, AL
+   
+   MOV DX, 10
+   
+   PUSH BX
+   has_number_to_show:
+   MOV AH, BH ; coluna
+   MOV AL, BL ; linha
+   CALL GLCD_GOTO_XY_TEXT
+   
+   MOV AX, CX
+   DIV DL
+   XCHG AH, AL
+   ADD AL, 48
+   CALL PRINT_CAR
+   
+   CMP AH, 0
+   JE no_more_numbers
+   MOV CL, AH
+   
+   DEC BH
+   JMP has_number_to_show
+   
+   no_more_numbers:
+   POP DX
+   CMP BH, DH
+   JNE out_a
+   
+   DEC DH
+   MOV AH, DH 
+   MOV AL, DL
+   CALL GLCD_GOTO_XY_TEXT
+   MOV AL, " "
+   CALL PRINT_CAR
+   
+   out_a:
+   POP DX
+   POP CX
+   POP BX
+   POP AX
+RET	
+	
+RECEBE_NUMEROS:
+   PUSH AX
+   PUSH BX
+   PUSH CX
+   PUSH DX
+   PUSH SI
+   
+   MOV SI, 0
+   MOV CX, 0
+   MOV CL, [NUMERO_DE_INPUTS]
+   MOV DH, 0
+   MOV DL, CL
+   DEC DL
+   esperar_numero:
+   
+   PUSH CX
+   MOV CX, DX
+   MOV AX, 1
+   
+   x:
+   CMP CX, 0
+   JE sai_x
+   PUSH DX
+   MOV DX, 10
+   MUL DL
+   POP DX
+   DEC CX
+   JMP x
+   
+   sai_x:
+   MOV BX, AX
+   POP CX
+   
+   CALL RECEBE_CARACTER
+   SUB AL, 48
+   MOV AH, 0
+   MUL BL
+   ADD SI, AX
+   
+   DEC DL
+   LOOP esperar_numero
+   
+   MOV AX, SI
+   MOV BL, 4 ; linha
+   MOV BH, 8 ; coluna
+   CALL IMPRIME_NUMERO
+   
+   CMP AL, [RESULTADO]
+   JE certo
+   
+   MOV [ACERTOU], 0
+   
+   JMP sai_do_recebe
+   
+   certo:
+   MOV [ACERTOU], 1
+   
+   sai_do_recebe:
+   POP SI
+   POP DX
+   POP CX
+   POP BX
+   POP AX
+RET
+
+WAIT_SECONDS:
+   PUSH AX
+   PUSH BX
+  
+   y:
+   CMP AX, 0
+   JE sai_wait
+   
+   MOV BX, [SECONDS]
+   wait_second:
+   CMP BX, [SECONDS]
+   JNE new_second
+   JMP wait_second
+   
+   new_second:
+   DEC AX
+   JMP y
+   
+   sai_wait:
+   POP BX
+   POP AX
+RET
+	
 ;POSICIONA CURSOR COLUNA 15, LINHA 1
 ;IMPRIME LETRA "B"		
-	;MOV AH,15 ;COLUNA
-	;MOV AL,1  ;LINHA
+	;MOV AH, 15 ;COLUNA
+	;MOV AL, 1  ;LINHA
         ;CALL GLCD_GOTO_XY_TEXT
 	;MOV AL,"B"
 	;CALL PRINT_CAR
@@ -1419,6 +1655,23 @@ DEMO:
 	;CALL PLOT_BMP	
 	
 	JMP DEMO
+
+; Pega o range informado em AX e retorna um nï¿½mero aleatorio dentro deste range no mesmo registrador	
+; Se informado range 1 ou 0, retorna 0, caso contrï¿½rio retorna 0 atï¿½ (n - 1).
+GENERATE_RANDOM:
+   PUSH BX
+   PUSH DX
+   
+   MOV AH, 0 ; garantia de que nï¿½o serï¿½ informado um nï¿½mero incorreto.
+   
+   MOV BL, [CONTADOR_SEED]	; SEED sempre serï¿½ entre 0 e 99.
+   MUL BL			;
+   MOV BL, 100 			; A lï¿½gica aqui ï¿½ multiplicar o range por um nï¿½mero entre 0 e 0.99
+   DIV BL 			; 
+				; O quociente serï¿½ o nï¿½mero aleatï¿½rio.
+   POP DX			
+   POP BX
+RET
 	
 .DATA
 CONTADOR_SEED DB 0 ; SEED PARA NUMERO ALEATORIO
@@ -1429,6 +1682,12 @@ COL_DATA DB 0
 COL_DATA_AUX DB 0
 READ_DATA DB 0
 LINHA DB 0
+
+NUM_1 DB 0
+NUM_2 DB 0
+RESULTADO DB 0
+NUMERO_DE_INPUTS DB 0
+ACERTOU DB 0
 
 SECONDS DW 0
 SECONDS_MUSICA DW 0
