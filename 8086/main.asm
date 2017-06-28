@@ -1253,6 +1253,7 @@ ANIMACAO_ACERTO:
    PUSHF
    PUSH DX
    PUSH AX
+   PUSH BX
    MOV SECONDS,0
    
 ;sprite 128x64 bits
@@ -1298,10 +1299,21 @@ ANIMACAO_ACERTO:
 	 JMP CPM_AA4 
 	 
    AA5:
-      CALL GLCD_CLR
+      MOV AL, [RESULTADO]
+      MOV BL, 2 
+      MOV BH, 3 
+      CALL IMPRIME_NUMERO
+      CPM_AA5:
+	 CMP SECONDS, 10
+	 JE AA6
+	 JMP CPM_AA5
+      
+   AA6:   
+      CALL GLCD_CLR   
    
    POP AX
    POP DX
+   POP BX
    POPF
    RET  
  
