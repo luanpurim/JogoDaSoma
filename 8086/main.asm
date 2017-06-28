@@ -1340,9 +1340,11 @@ DEMO:
 ;APAGA DISPLAY
 	CALL GLCD_CLR
 	
-	CALL ANIMACAO_INICIAL
-	again:
+	CALL IMPRIME_MENSAGEM_QUALQUER_TECLA
 	
+	CALL ANIMACAO_INICIAL
+	MOV BX, 2
+	again:
 	CALL GERAR_CONTA
 	CALL RECEBE_NUMEROS
 	MOV AX, 4
@@ -1354,7 +1356,17 @@ DEMO:
 	
 	CALL MUSICA_ERRO
 	CALL ANIMACAO_ERRO
-	jmp jmp_again
+	
+	CMP BX, 0
+	JNE repetir_conta
+	
+	CALL IMPRIME_MENSAGEM_NUMERO_CORRETO
+	JMP jmp_again
+	
+	repetir_conta:
+	DEC BX
+	MOV DX, 1 ; repetir conta
+	jmp again
 	
 	deu_boa:
 	CALL MUSICA_ACERTO
@@ -1364,6 +1376,8 @@ DEMO:
 	CALL WAIT_SECONDS
 	
 	jmp_again:
+	MOV BX, 2
+	MOV DX, 0 ; gerar nova conta
 	jmp again
 
 GERAR_CONTA:
@@ -1371,6 +1385,33 @@ GERAR_CONTA:
       PUSH BX
       PUSH CX
 
+      CALL GLCD_CLR
+      
+      CMP DX, 1
+      JNE gerar_aleatorio
+      
+      MOV AL, [NUM_1] 
+      MOV BL, 1 ; linha
+      MOV BH, 8 ; coluna
+      CALL IMPRIME_NUMERO
+      
+      PUSH AX
+      MOV AL, 2 ; linha
+      MOV AH, 6 ; coluna
+      CALL GLCD_GOTO_XY_TEXT
+      MOV AL, "+"
+      CALL PRINT_CAR
+      POP AX
+      
+      MOV AL, [NUM_2]
+      MOV BL, 2 ; linha
+      MOV BH, 8 ; coluna
+      CALL IMPRIME_NUMERO
+      
+      CALL IMPRIME_TRACOS
+      JMP fim_gerar_conta
+      
+      gerar_aleatorio:
       MOV AL, 100
       CALL GENERATE_RANDOM
       MOV [NUM_1], AL
@@ -1390,7 +1431,6 @@ GERAR_CONTA:
       SUB CL, AL
       MOV AL, CL
       CALL GENERATE_RANDOM
-      MOV DL, AL
       MOV [NUM_2], AL
       MOV BL, 2 ; linha
       MOV BH, 8 ; coluna
@@ -1405,6 +1445,7 @@ GERAR_CONTA:
       CALL CONTAR_QUANTIDADE_NUMEROS
       MOV [NUMERO_DE_INPUTS], AL
       
+      fim_gerar_conta:
       POP CX
       POP BX
       POP AX
@@ -1464,6 +1505,25 @@ IMPRIME_TRACOS:
       POP CX
       POP AX
 RET	
+	
+VALIDAR_INPUT:
+   PUSH AX
+   
+   CMP AL, 48
+   JL invalid
+   
+   CMP AL, 57
+   JG invalid
+   
+   MOV BX, 0
+   JMP fim_validacao
+   
+   invalid:
+   MOV BX, 1
+   
+   fim_validacao:
+   POP AX
+RET
 	
 IMPRIME_NUMERO:
    PUSH AX
@@ -1547,7 +1607,16 @@ RECEBE_NUMEROS:
    MOV BX, AX
    POP CX
    
+   PUSH BX
+   
+   recebe_de_novo:
    CALL RECEBE_CARACTER
+   CALL VALIDAR_INPUT
+   CMP BX, 1
+   JE recebe_de_novo
+   
+   POP BX
+   
    SUB AL, 48
    MOV AH, 0
    MUL BL
@@ -1600,6 +1669,66 @@ WAIT_SECONDS:
    sai_wait:
    POP BX
    POP AX
+RET
+
+IMPRIME_MENSAGEM_NUMERO_CORRETO:
+   PUSH SI
+   PUSH AX
+   PUSH BX
+   
+   LEA SI, MENSAGEM_NUMERO_CORRETO
+   CALL IMPRIME_MENSAGEM
+   MOV BH, 9
+   MOV BL, 4
+   MOV AL, [RESULTADO]
+   CALL IMPRIME_NUMERO
+   MOV AL, 6
+   CALL WAIT_SECONDS
+   
+   POP BX
+   POP AX
+   POP SI
+RET
+
+IMPRIME_MENSAGEM_QUALQUER_TECLA:
+   PUSH SI
+
+   LEA SI, MENSAGEM_INICIAR_JOGO
+   CALL IMPRIME_MENSAGEM
+   
+   CALL RECEBE_CARACTER
+   
+   POP SI
+RET
+	
+IMPRIME_MENSAGEM:
+   PUSH SI
+   PUSH BX
+   PUSH AX
+   
+   MOV BX, 0
+   
+   CALL GLCD_CLR
+   
+   MOV AH, 1
+   MOV AL, 4
+   loop_mensagem:
+   CMP [SI], BL
+   JE fim_da_mensagem
+   
+   CALL GLCD_GOTO_XY_TEXT
+   PUSH AX
+   MOV AL, [SI]
+   CALL PRINT_CAR
+   POP AX
+   INC SI
+   INC AH
+   JMP loop_mensagem
+  
+   fim_da_mensagem:
+   POP AX
+   POP BX
+   POP SI
 RET
 	
 ;POSICIONA CURSOR COLUNA 15, LINHA 1
@@ -1711,6 +1840,9 @@ NUM_2 DB 0
 RESULTADO DB 0
 NUMERO_DE_INPUTS DB 0
 ACERTOU DB 0
+
+MENSAGEM_INICIAR_JOGO DB "Press any key",0
+MENSAGEM_NUMERO_CORRETO DB "Answer: ",0
 
 SECONDS DW 0
 SECONDS_MUSICA DW 0
